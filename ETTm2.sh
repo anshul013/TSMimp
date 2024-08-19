@@ -9,11 +9,8 @@ fi
 if [ ! -d "./logs/LongForecasting/TSMixer" ]; then
     mkdir ./logs/LongForecasting/TSMixer
 fi
-<<<<<<< HEAD
+
 seq_len=512
-=======
-seq_len=336
->>>>>>> e9653bc9d66b38d0b89d5b0a4cf149caa6566eef
 model_name=TSMixer
 dataset=ETTm2
 num_channels=7
@@ -23,13 +20,8 @@ pred_len=96
 python3 -u run_longExp.py \
   --activation 'relu' \
   --dropout 0.9\
-<<<<<<< HEAD
   --hidden_size 256\
   --num_blocks 8 \
-=======
-  --hidden_size 64\
-  --num_blocks 2 \
->>>>>>> e9653bc9d66b38d0b89d5b0a4cf149caa6566eef
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path $dataset.csv \
@@ -50,11 +42,7 @@ pred_len=192
 python3 -u run_longExp.py \
   --activation 'relu' \
   --dropout 0.9\
-<<<<<<< HEAD
   --hidden_size 256\
-=======
-  --hidden_size 32\
->>>>>>> e9653bc9d66b38d0b89d5b0a4cf149caa6566eef
   --num_blocks 1 \
   --is_training 1 \
   --root_path ./dataset/ \
@@ -76,13 +64,8 @@ pred_len=336
 python3 -u run_longExp.py \
   --activation 'relu' \
   --dropout 0.9\
-<<<<<<< HEAD
   --hidden_size 512\
   --num_blocks 8 \
-=======
-  --hidden_size 32\
-  --num_blocks 1 \
->>>>>>> e9653bc9d66b38d0b89d5b0a4cf149caa6566eef
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path $dataset.csv \
@@ -103,13 +86,8 @@ pred_len=720
 python3 -u run_longExp.py \
   --activation 'relu' \
   --dropout 0.1\
-<<<<<<< HEAD
   --hidden_size 256\
   --num_blocks 8 \
-=======
-  --hidden_size 64\
-  --num_blocks 2 \
->>>>>>> e9653bc9d66b38d0b89d5b0a4cf149caa6566eef
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path $dataset.csv \
