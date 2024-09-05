@@ -18,7 +18,7 @@ class Model(nn.Module):
         self.channels = configs.enc_in
         self.pred_len = configs.pred_len
         self.hidden_dim = configs.hidden_size
-        self.num_clusers = configs.num_clusters
+        self.num_clusters = configs.num_clusters
         self.rev_norm = RevIN(self.channels, affine=configs.affine)
         self.ccm = CCM(self.channels, self.hidden_dim, self.num_clusters)
 
