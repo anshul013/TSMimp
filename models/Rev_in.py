@@ -29,8 +29,8 @@ class RevIN(nn.Module):
 
     def _init_params(self):
         # initialize RevIN params: (C,)
-        self.affine_weight = nn.Parameter(torch.ones(self.num_features))
-        self.affine_bias = nn.Parameter(torch.zeros(self.num_features))
+        self.affine_weight = nn.Parameter(torch.ones(self.num_features+1))
+        self.affine_bias = nn.Parameter(torch.zeros(self.num_features+1))
 
     def _get_statistics(self, x):
         dim2reduce = tuple(range(1, x.ndim-1))
