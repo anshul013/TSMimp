@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from models.Rev_in import RevIN
+from models.ccm import CCM
 
 class Model(nn.Module):
     """
@@ -16,7 +17,10 @@ class Model(nn.Module):
                                         configs.activation, configs.single_layer_mixer)
         self.channels = configs.enc_in
         self.pred_len = configs.pred_len
+        self.hidden_dim = configs.hidden_size
+        self.num_clusers = configs.num_clusters
         self.rev_norm = RevIN(self.channels, affine=configs.affine)
+        self.ccm = CCM(self.channels, self.hidden_dim, self.num_clusters)
 
         #Individual layer for each variate(if true) otherwise, one shared linear
         self.individual_linear_layers = configs.individual
@@ -29,6 +33,8 @@ class Model(nn.Module):
 
     def forward(self, x):
         # x: [Batch, Input length, Channel]
+        # Apply CCM
+        x = self.ccm(x)
         x = self.rev_norm(x, 'norm')
         for _ in range(self.num_blocks):
             x = self.mixer_block(x)
