@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 from models.Rev_in import RevIN
 
-class ClusterChannelModule(nn.Module):
+class CCM(nn.Module):
     def __init__(self, channels, hidden_dim, num_clusters):
-        super(ClusterChannelModule, self).__init__()
+        super(CCM, self).__init__()
         self.channels = channels
         self.hidden_dim = hidden_dim
         self.num_clusters = num_clusters
