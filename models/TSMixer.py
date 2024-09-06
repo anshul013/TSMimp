@@ -29,31 +29,45 @@ class CCM(nn.Module):
 
     def forward(self, x):
         # x shape: [batch_size, seq_len, channels]
-        batch_size, seq_len, _ = x.shape
-        
+        print("Input x shape:", x.shape)
+    
         # Normalize input
         x = F.normalize(x, dim=-1)
         
         # Compute similarity matrix S
         x_norm = torch.norm(x, dim=-1, keepdim=True)
         S = torch.exp(-torch.cdist(x, x) / (2 * x_norm**2))
+        print("Similarity matrix S shape:", S.shape)
         
         # Channel Embedding H via MLP
-        H = self.channel_mlp(x)  # [batch_size, seq_len, hidden_dim]
+        H = self.channel_mlp(x)
+        print("Channel Embedding H shape:", H.shape)
         
         # Compute Clustering Probability Matrix P
         P = F.softmax(torch.matmul(H, self.cluster_embeddings.t()) / torch.norm(self.cluster_embeddings, dim=1), dim=-1)
+        print("Clustering Probability Matrix P shape:", P.shape)
         
         # Sample Clustering Membership Matrix M
         M = torch.bernoulli(P)
+        print("Clustering Membership Matrix M shape:", M.shape)
         
         # Update Cluster Embedding C via Cross Attention
         Q = self.W_Q(self.cluster_embeddings)
         K = self.W_K(H)
-        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / (self.hidden_dim ** 0.5)
-        attention_probs = F.softmax(attention_scores, dim=-1)
-        C = F.normalize(torch.matmul(attention_probs, H).transpose(0, 1) * M, dim=-1)
+        print("Q shape:", Q.shape)
+        print("K shape:", K.shape)
         
+        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / (self.hidden_dim ** 0.5)
+        print("Attention scores shape:", attention_scores.shape)
+        
+        attention_probs = F.softmax(attention_scores, dim=-1)
+        print("Attention probs shape:", attention_probs.shape)
+        
+        print("H shape for matmul:", H.shape)
+        print("M shape for multiplication:", M.shape)
+        
+        C = F.normalize(torch.matmul(attention_probs, H).transpose(0, 1) * M, dim=-1)
+        print("Updated Cluster Embedding C shape:", C.shape)
         # Update via Temporal Modules (assuming this is done in the main model)
         H_updated = H  # This will be updated by Temporal Modules in the main model
         
