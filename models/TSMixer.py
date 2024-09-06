@@ -1,7 +1,68 @@
 import torch
 import torch.nn as nn
 from models.Rev_in import RevIN
-from models.ccm import CCM
+
+class ClusterChannelModule(nn.Module):
+    def __init__(self, channels, hidden_dim, num_clusters):
+        super(ClusterChannelModule, self).__init__()
+        self.channels = channels
+        self.hidden_dim = hidden_dim
+        self.num_clusters = num_clusters
+        
+        # Initialize K linear layers for cluster embeddings
+        self.cluster_embeddings = nn.Parameter(torch.randn(num_clusters, hidden_dim))
+        
+        # MLP for channel embedding
+        self.channel_mlp = nn.Sequential(
+            nn.Linear(channels, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+        
+        # Cross Attention weights
+        self.W_Q = nn.Linear(hidden_dim, hidden_dim)
+        self.W_K = nn.Linear(hidden_dim, hidden_dim)
+        
+        # Output projection
+        self.output_projection = nn.Linear(hidden_dim, channels)
+
+    def forward(self, x):
+        # x shape: [batch_size, seq_len, channels]
+        batch_size, seq_len, _ = x.shape
+        
+        # Normalize input
+        x = F.normalize(x, dim=-1)
+        
+        # Compute similarity matrix S
+        x_norm = torch.norm(x, dim=-1, keepdim=True)
+        S = torch.exp(-torch.cdist(x, x) / (2 * x_norm**2))
+        
+        # Channel Embedding H via MLP
+        H = self.channel_mlp(x)  # [batch_size, seq_len, hidden_dim]
+        
+        # Compute Clustering Probability Matrix P
+        P = F.softmax(torch.matmul(H, self.cluster_embeddings.t()) / torch.norm(self.cluster_embeddings, dim=1), dim=-1)
+        
+        # Sample Clustering Membership Matrix M
+        M = torch.bernoulli(P)
+        
+        # Update Cluster Embedding C via Cross Attention
+        Q = self.W_Q(self.cluster_embeddings)
+        K = self.W_K(H)
+        attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / (self.hidden_dim ** 0.5)
+        attention_probs = F.softmax(attention_scores, dim=-1)
+        C = F.normalize(torch.matmul(attention_probs, H) * M.transpose(-2, -1), dim=-1)
+        
+        # Update via Temporal Modules (assuming this is done in the main model)
+        H_updated = H  # This will be updated by Temporal Modules in the main model
+        
+        # Weight Averaging and Projection
+        Y = torch.zeros_like(x)
+        for i in range(self.channels):
+            theta_i = torch.sum(P[:, :, i].unsqueeze(-1) * self.cluster_embeddings, dim=1)
+            Y[:, :, i] = self.output_projection(H_updated * theta_i.unsqueeze(1))
+        
+        return Y, C
 
 class Model(nn.Module):
     """
@@ -12,15 +73,16 @@ class Model(nn.Module):
         super(Model, self).__init__()
         #Defining the reversible instance normalization
         self.num_blocks = configs.num_blocks
-        self.mixer_block = MixerBlock(configs.enc_in, configs.hidden_size,
-                                      configs.seq_len, configs.dropout,
-                                        configs.activation, configs.single_layer_mixer)
         self.channels = configs.enc_in
         self.pred_len = configs.pred_len
         self.hidden_dim = configs.hidden_size
         self.num_clusters = configs.num_clusters
-        self.rev_norm = RevIN(self.channels, affine=configs.affine)
+        # Add ClusterChannelModule
         self.ccm = CCM(self.channels, self.hidden_dim, self.num_clusters)
+        self.rev_norm = RevIN(self.channels, affine=configs.affine)
+        self.mixer_block = MixerBlock(configs.enc_in, configs.hidden_size,
+                                      configs.seq_len, configs.dropout,
+                                        configs.activation, configs.single_layer_mixer) 
 
         #Individual layer for each variate(if true) otherwise, one shared linear
         self.individual_linear_layers = configs.individual
@@ -34,7 +96,7 @@ class Model(nn.Module):
     def forward(self, x):
         # x: [Batch, Input length, Channel]
         # Apply CCM
-        x = self.ccm(x)
+        x, cluster_embedding = self.ccm(x)
         x = self.rev_norm(x, 'norm')
         for _ in range(self.num_blocks):
             x = self.mixer_block(x)
@@ -49,7 +111,7 @@ class Model(nn.Module):
             y = self.output_linear_layers(x.clone())
         y = torch.swapaxes(y, 1, 2)
         y = self.rev_norm(y, 'denorm')
-        return y
+        return y, cluster_embedding
 
     
 class MlpBlockFeatures(nn.Module):
