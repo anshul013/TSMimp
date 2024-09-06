@@ -52,7 +52,7 @@ class CCM(nn.Module):
         K = self.W_K(H)
         attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / (self.hidden_dim ** 0.5)
         attention_probs = F.softmax(attention_scores, dim=-1)
-        C = F.normalize(torch.matmul(attention_probs, H) * M.transpose(-2, -1), dim=-1)
+        C = F.normalize(torch.matmul(attention_probs, H).transpose(0, 1) * M, dim=-1)
         
         # Update via Temporal Modules (assuming this is done in the main model)
         H_updated = H  # This will be updated by Temporal Modules in the main model
