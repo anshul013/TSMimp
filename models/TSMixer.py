@@ -66,7 +66,14 @@ class CCM(nn.Module):
         print("H shape for matmul:", H.shape)
         print("M shape for multiplication:", M.shape)
         
-        C = F.normalize(torch.matmul(attention_probs, H).transpose(0, 1) * M, dim=-1)
+        # Compute C
+        C_temp = torch.matmul(attention_probs, H)  # Shape: [32, 16, 8]
+        C_temp = C_temp.transpose(1, 2)  # Shape: [32, 8, 16]
+        M_transposed = M.transpose(1, 2)  # Shape: [32, 16, 512]
+        C = F.normalize(torch.matmul(C_temp, M_transposed), dim=-1)  # Shape: [32, 8, 512]
+
+        # Transpose C to match the expected output shape
+        C = C.transpose(1, 2)  # Final shape: [32, 512, 8]
         print("Updated Cluster Embedding C shape:", C.shape)
         # Update via Temporal Modules (assuming this is done in the main model)
         H_updated = H  # This will be updated by Temporal Modules in the main model
