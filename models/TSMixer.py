@@ -29,7 +29,7 @@ class CCM(nn.Module):
 
     def forward(self, x):
         # x shape: [batch_size, seq_len, channels]
-        print("Input x shape:", x.shape)
+        # print("Input x shape:", x.shape)
     
         # Normalize input
         x = F.normalize(x, dim=-1)
@@ -37,34 +37,34 @@ class CCM(nn.Module):
         # Compute similarity matrix S
         x_norm = torch.norm(x, dim=-1, keepdim=True)
         S = torch.exp(-torch.cdist(x, x) / (2 * x_norm**2))
-        print("Similarity matrix S shape:", S.shape)
+        # print("Similarity matrix S shape:", S.shape)
         
         # Channel Embedding H via MLP
         H = self.channel_mlp(x)
-        print("Channel Embedding H shape:", H.shape)
+        # print("Channel Embedding H shape:", H.shape)
         
         # Compute Clustering Probability Matrix P
         P = F.softmax(torch.matmul(H, self.cluster_embeddings.t()) / torch.norm(self.cluster_embeddings, dim=1), dim=-1)
-        print("Clustering Probability Matrix P shape:", P.shape)
+        # print("Clustering Probability Matrix P shape:", P.shape)
         
         # Sample Clustering Membership Matrix M
         M = torch.bernoulli(P)
-        print("Clustering Membership Matrix M shape:", M.shape)
+        # print("Clustering Membership Matrix M shape:", M.shape)
         
         # Update Cluster Embedding C via Cross Attention
         Q = self.W_Q(self.cluster_embeddings)
         K = self.W_K(H)
-        print("Q shape:", Q.shape)
-        print("K shape:", K.shape)
+        # print("Q shape:", Q.shape)
+        # print("K shape:", K.shape)
         
         attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / (self.hidden_dim ** 0.5)
-        print("Attention scores shape:", attention_scores.shape)
+        # print("Attention scores shape:", attention_scores.shape)
         
         attention_probs = F.softmax(attention_scores, dim=-1)
-        print("Attention probs shape:", attention_probs.shape)
+        # print("Attention probs shape:", attention_probs.shape)
         
-        print("H shape for matmul:", H.shape)
-        print("M shape for multiplication:", M.shape)
+        # print("H shape for matmul:", H.shape)
+        # print("M shape for multiplication:", M.shape)
         
         # Compute C
         C_temp = torch.matmul(attention_probs, H)  # Shape: [32, 16, 8]
@@ -74,24 +74,24 @@ class CCM(nn.Module):
 
         # Transpose C to match the expected output shape
         C = C.transpose(1, 2)  # Final shape: [32, 512, 8]
-        print("Updated Cluster Embedding C shape:", C.shape)
+        # print("Updated Cluster Embedding C shape:", C.shape)
         # Update via Temporal Modules (assuming this is done in the main model)
         H_updated = H + C  # Simple residual connection as temporal updatel
-        print("Updated H shape after temporal update:", H_updated.shape)
+        # print("Updated H shape after temporal update:", H_updated.shape)
 
         # Weight Averaging and Projection
         Y = torch.zeros_like(x)
-        print("Y shape:", Y.shape)
+        # print("Y shape:", Y.shape)
         P_reshaped = P.transpose(1, 2)  # Shape: [32, 16, 512]
-        print("P_reshaped shape:", P_reshaped.shape)
+        # print("P_reshaped shape:", P_reshaped.shape)
         theta = torch.sum(P_reshaped[:, :, :, None] * self.cluster_embeddings[None, :, None, :], dim=1)  # Shape: [32, 512, 8]
-        print("theta shape:", theta.shape)
+        # print("theta shape:", theta.shape)
         # Combine H_updated and theta
         combined = H_updated * theta  # Shape: [32, 512, 8]    
-        print("combined shape:", combined.shape)
+        # print("combined shape:", combined.shape)
         # Project to output channels
         Y = self.output_projection(combined)  # Shape: [32, 512, 7]
-        print("Y shape:", Y.shape)
+        # print("Y shape:", Y.shape)
         # # Weight Averaging and Projection
         # Y = torch.zeros_like(x)
         # P_reshaped = P.transpose(1, 2)  # Shape: [32, 16, 512]
@@ -138,14 +138,14 @@ class Model(nn.Module):
     
     def forward(self, x):
         # x: [Batch, Input length, Channel]
-        print("Input shape:", x.shape)
-        print("self.channels:", self.channels)
-        print("RevIN affine_weight shape:", self.rev_norm.affine_weight.shape)
+        # print("Input shape:", x.shape)
+        # print("self.channels:", self.channels)
+        # print("RevIN affine_weight shape:", self.rev_norm.affine_weight.shape)
         # Apply CCM
         x, cluster_embedding = self.ccm(x)
-        print("Shape after CCM:", x.shape)
+        # print("Shape after CCM:", x.shape)
         x = self.rev_norm(x, 'norm')
-        print("Shape of x after RevIN:", x.shape)
+        # print("Shape of x after RevIN:", x.shape)
         for _ in range(self.num_blocks):
             x = self.mixer_block(x)
         #Final linear layer applied on the transpoed mixers' output
