@@ -76,15 +76,24 @@ class CCM(nn.Module):
         C = C.transpose(1, 2)  # Final shape: [32, 512, 8]
         print("Updated Cluster Embedding C shape:", C.shape)
         # Update via Temporal Modules (assuming this is done in the main model)
-        H_updated = H  # This will be updated by Temporal Modules in the main model
-        
+        H_updated = H + C  # Simple residual connection as temporal updatel
+         print("Updated H shape after temporal update:", H_updated.shape)
+    
         # Weight Averaging and Projection
         Y = torch.zeros_like(x)
+        P_reshaped = P.transpose(1, 2)  # Shape: [32, 16, 512]
         for i in range(self.channels):
-            theta_i = torch.sum(P[:, :, i].unsqueeze(-1) * self.cluster_embeddings, dim=1)
-            Y[:, :, i] = self.output_projection(H_updated * theta_i.unsqueeze(1))
+            theta_i = torch.sum(P_reshaped[:, :, :, None] * self.cluster_embeddings[None, :, None, :], dim=1)  # Shape: [32, 512, 8]
+            Y[:, :, i] = self.output_projection(H_updated * theta_i).squeeze(-1)
         
         return Y, C
+        # # Weight Averaging and Projection
+        # Y = torch.zeros_like(x)
+        # for i in range(self.channels):
+        #     theta_i = torch.sum(P[:, :, i].unsqueeze(-1) * self.cluster_embeddings, dim=1)
+        #     Y[:, :, i] = self.output_projection(H_updated * theta_i.unsqueeze(1))
+        
+        # return Y, C
 
 class Model(nn.Module):
     """
