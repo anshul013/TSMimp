@@ -77,7 +77,7 @@ class CCM(nn.Module):
         print("Updated Cluster Embedding C shape:", C.shape)
         # Update via Temporal Modules (assuming this is done in the main model)
         H_updated = H + C  # Simple residual connection as temporal updatel
-         print("Updated H shape after temporal update:", H_updated.shape)
+        print("Updated H shape after temporal update:", H_updated.shape)
     
         # Weight Averaging and Projection
         Y = torch.zeros_like(x)
