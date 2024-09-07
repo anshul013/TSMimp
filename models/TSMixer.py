@@ -135,12 +135,15 @@ class Model(nn.Module):
                 self.output_linear_layers.append(nn.Linear(configs.seq_len, configs.pred_len))
         else :
             self.output_linear_layers = nn.Linear(configs.seq_len, configs.pred_len)
-
+    
     def forward(self, x):
         # x: [Batch, Input length, Channel]
+        print("Input shape:", x.shape)
+        print("self.channels:", self.channels)
+        print("RevIN affine_weight shape:", self.rev_norm.affine_weight.shape)
         # Apply CCM
         x, cluster_embedding = self.ccm(x)
-        print("Shape of x before RevIN:", x.shape)
+        print("Shape after CCM:", x.shape)
         x = self.rev_norm(x, 'norm')
         print("Shape of x after RevIN:", x.shape)
         for _ in range(self.num_blocks):
