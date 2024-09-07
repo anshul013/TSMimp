@@ -159,7 +159,7 @@ class Model(nn.Module):
             y = self.output_linear_layers(x.clone())
         y = torch.swapaxes(y, 1, 2)
         y = self.rev_norm(y, 'denorm')
-        return y, cluster_embedding
+        return y
 
     
 class MlpBlockFeatures(nn.Module):
