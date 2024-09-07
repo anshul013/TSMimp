@@ -140,7 +140,9 @@ class Model(nn.Module):
         # x: [Batch, Input length, Channel]
         # Apply CCM
         x, cluster_embedding = self.ccm(x)
+        print("Shape of x before RevIN:", x.shape)
         x = self.rev_norm(x, 'norm')
+        print("Shape of x after RevIN:", x.shape)
         for _ in range(self.num_blocks):
             x = self.mixer_block(x)
         #Final linear layer applied on the transpoed mixers' output
