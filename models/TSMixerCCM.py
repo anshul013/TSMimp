@@ -84,9 +84,10 @@ class Model(nn.Module):
         # Apply attention weights to V
         attention_output = torch.matmul(attention_weights, V)  # [Batch, K, d]
 
-        # Update cluster embeddings using p_ik instead of M
-        updated_cluster_embeds = torch.matmul(p_ik.transpose(1, 2), attention_output)  # [Batch, K, d]
-        self.cluster_embeds.data.copy_(updated_cluster_embeds.mean(dim=0))  # Update cluster embeds
+        # Update cluster embeddings using p_ik
+        p_ik_sum = p_ik.sum(dim=1, keepdim=True)  # [Batch, 1, K]
+        updated_cluster_embeds = (p_ik_sum.transpose(1, 2) * attention_output).mean(dim=0)  # [K, d]
+        self.cluster_embeds.data.copy_(updated_cluster_embeds)  # Update cluster embedss
 
         # Update Channel Embedding via Temporal Module
         H_updated = self.temporal_module(h_i)
