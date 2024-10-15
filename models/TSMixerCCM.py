@@ -58,12 +58,10 @@ class Model(nn.Module):
         h_i_normalized = h_i / (h_i.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
         c_k_normalized = self.cluster_embeds / (self.cluster_embeds.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
 
-        # Compute similarity scores using normalized embeddings
-        similarity_scores = torch.matmul(h_i_normalized, c_k_normalized.T)  # [Batch, Channels, K]
-    
-        # Compute clustering probability matrix P using softmax
-        p_ik = torch.softmax(similarity_scores, dim=-1)  # Normalize to get probabilities
-        
+        # Compute clustering probability matrix P using dot product and softmax
+        p_ik = torch.softmax(torch.matmul(h_i_normalized, c_k_normalized.T), dim=-1)  # [Batch, Channels, K]
+
+        # Sample clustering membership matrix M using Bernoulli sampling
         M = torch.bernoulli(p_ik)  # Sampling clustering membership matrix
 
         # Update Cluster Embedding C via Cross Attention
@@ -72,15 +70,15 @@ class Model(nn.Module):
         V = self.W_v(h_i)  # [Batch, Channels, d]
 
         # Attention mechanism: dot product of Q and K, scaling, and applying to V
-        attention_weights = torch.softmax(torch.exp((Q @ K.transpose(-1, -2)) / (self.hidden_size ** 0.5)) @ M.T, dim=-1)
+        attention_weights = torch.softmax(torch.exp((Q @ K.transpose(-1, -2)) / (self.hidden_size ** 0.5)) * M.unsqueeze(1), dim=-1)
         attention_output = torch.einsum('bcd,kc->bkd', attention_weights, V)  # Apply attention weights to V
 
-        # Update cluster embeddings using weighted average
+        # Update cluster embeddings using weighted average based on clustering probabilities
         updated_cluster_embeds = (attention_output.permute(0, 2, 1) * p_ik.unsqueeze(-1)).sum(dim=1)  # [Batch, d]
         self.cluster_embeds.data.copy_(updated_cluster_embeds.mean(dim=0))  # Update cluster embeds
 
         # Update Channel Embedding via Temporal Module
-        updated_channel_embeds = self.temporal_module(h_i)  # Use MlpBlockTimesteps or the custom Temporal Module
+        updated_channel_embeds = self.temporal_module(h_i)
 
         # Mixing process using updated channel embeddings
         x = updated_channel_embeds  # Use updated channel embeddings for mixing
@@ -196,3 +194,4 @@ class TemporalModule(nn.Module):
 
     def forward(self, x):
         return self.temporal_mlp(x)
+    
