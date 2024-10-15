@@ -53,7 +53,7 @@ class Model(nn.Module):
         h_i = self.channel_mlp(x)  # Channel embeddings via MLP
 
         # Similarity calculation for clustering
-        S = torch.exp(-torch.norm(h_i.unsqueeze(1) - h_i.unsqueeze(2), dim=-1) ** 2 / (2 * 1.0 ** 2))  # Similarity matrix
+        #S = torch.exp(-torch.norm(h_i.unsqueeze(1) - h_i.unsqueeze(2), dim=-1) ** 2 / (2 * 1.0 ** 2))  # Similarity matrix
         # Normalize channel embeddings and cluster embeddings
         h_i_normalized = h_i / (h_i.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
         c_k_normalized = self.cluster_embeds / (self.cluster_embeds.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
@@ -63,6 +63,7 @@ class Model(nn.Module):
     
         # Compute clustering probability matrix P using softmax
         p_ik = torch.softmax(similarity_scores, dim=-1)  # Normalize to get probabilities
+        
         M = torch.bernoulli(p_ik)  # Sampling clustering membership matrix
 
         # Update Cluster Embedding C via Cross Attention
@@ -71,7 +72,7 @@ class Model(nn.Module):
         V = self.W_v(h_i)  # [Batch, Channels, d]
 
         # Attention mechanism: dot product of Q and K, scaling, and applying to V
-        attention_weights = torch.softmax((Q @ K.transpose(-1, -2)) / (self.hidden_size ** 0.5), dim=-1)
+        attention_weights = torch.softmax(torch.exp((Q @ K.transpose(-1, -2)) / (self.hidden_size ** 0.5)) @ M.T, dim=-1)
         attention_output = torch.einsum('bcd,kc->bkd', attention_weights, V)  # Apply attention weights to V
 
         # Update cluster embeddings using weighted average
