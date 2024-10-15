@@ -50,12 +50,19 @@ class Model(nn.Module):
     def forward(self, x):
         # x: [Batch, Input length, Channel]
         x = self.rev_norm(x, 'norm')  # Normalize input
-        h_i = self.channel_embedding(x)  # Channel embeddings via MLP
+        h_i = self.channel_mlp(x)  # Channel embeddings via MLP
 
         # Similarity calculation for clustering
         S = torch.exp(-torch.norm(h_i.unsqueeze(1) - h_i.unsqueeze(2), dim=-1) ** 2 / (2 * 1.0 ** 2))  # Similarity matrix
-        pi_k = self.mlp_cluster(h_i)  # Channel embeddings via MLP
-        p_ik = torch.softmax(pi_k, dim=-1)  # Clustering probabilities
+        # Normalize channel embeddings and cluster embeddings
+        h_i_normalized = h_i / (h_i.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
+        c_k_normalized = self.cluster_embeds / (self.cluster_embeds.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
+
+        # Compute similarity scores using normalized embeddings
+        similarity_scores = torch.matmul(h_i_normalized, c_k_normalized.T)  # [Batch, Channels, K]
+    
+        # Compute clustering probability matrix P using softmax
+        p_ik = torch.softmax(similarity_scores, dim=-1)  # Normalize to get probabilities
         M = torch.bernoulli(p_ik)  # Sampling clustering membership matrix
 
         # Update Cluster Embedding C via Cross Attention
