@@ -72,14 +72,14 @@ class Model(nn.Module):
         V = self.W_v(h_i)  # [Batch, Channels, d]
 
         # Attention mechanism: dot product of Q and K, scaling
-        attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / (self.hidden_size ** 0.5)  # [Batch, K, Channels]
+        attention_scores = torch.exp(torch.matmul(Q, K.transpose(-1, -2)) / (self.hidden_size ** 0.5))  # [Batch, K, Channels]
     
         # Apply membership matrix M
-        M_expanded = M.transpose(-1, -2).unsqueeze(1)  # [Batch, 1, Channels, K]
-        attention_scores = attention_scores.unsqueeze(-1) * M_expanded  # [Batch, K, Channels, K]
+        M_expanded = M.permute(0, 2, 1)  # [Batch, K, Channels]
+        attention_scores = attention_scores * M_expanded  # [Batch, K, Channels]
     
-        # Sum over the last dimension and apply softmax
-        attention_weights = torch.softmax(attention_scores.sum(-1), dim=-1)  # [Batch, K, Channels]
+        # Apply softmax
+        attention_weights = torch.softmax(attention_scores, dim=-1)  # [Batch, K, Channels]
     
         # Apply attention weights to V
         attention_output = torch.matmul(attention_weights, V)  # [Batch, K, d]
