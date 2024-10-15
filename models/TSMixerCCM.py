@@ -42,9 +42,9 @@ class Model(nn.Module):
 
         # MLP for channel embeddings in the cluster assigner
         self.channel_mlp = nn.Sequential(
-            nn.Linear(self.channels, self.hidden_size),
+            nn.Linear(configs.seq_len, configs.hidden_size),
             nn.ReLU(),
-            nn.Linear(self.hidden_size, self.hidden_size)
+            nn.Linear(configs.hidden_size, configs.hidden_size)
         )
 
     def forward(self, x):
