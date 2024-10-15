@@ -6,13 +6,14 @@ if [ ! -d "./logs/LongForecasting" ]; then
     mkdir ./logs/LongForecasting
 fi
 
-if [ ! -d "./logs/LongForecasting/TSMixer" ]; then
-    mkdir ./logs/LongForecasting/TSMixer
+if [ ! -d "./logs/LongForecasting/TSMixerCCM" ]; then
+    mkdir ./logs/LongForecasting/TSMixerCCM
 fi
 seq_len=512
-model_name=TSMixer
+model_name=TSMixerCCM
 dataset=ETTh1
 num_channels=7
+num_clusters = 4
 
 #Best configuration for ETTm2 and 96 frames horizon
 pred_len=96

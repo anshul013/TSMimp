@@ -1,6 +1,6 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
-from models import Informer, Autoformer, TSMixerChannelAttention, Transformer, DLinear, Linear, NLinear, TSMixer, GatedLTSF, PatchTSMixer, PatchConv, GatedTSMixer, AttentionMixer, SCINet, ViTPatchConv
+from models import Informer, Autoformer, TSMixerChannelAttention, Transformer, DLinear, Linear, NLinear, TSMixer, TSMixerCCM, GatedLTSF, PatchTSMixer, PatchConv, GatedTSMixer, AttentionMixer, SCINet, ViTPatchConv
 from utils.tools import EarlyStopping, adjust_learning_rate, visual, test_params_flop
 from utils.metrics import metric
 
@@ -31,8 +31,9 @@ class Exp_Main(Exp_Basic):
             'DLinear': DLinear,
             'NLinear': NLinear,
             'Linear': Linear,
-            'TSMixer' : TSMixer,
-            'GatedLTSF' : GatedLTSF,
+            'TSMixer': TSMixer,
+            'TSMixerCCM': TSMixerCCM,
+            'GatedLTSF': GatedLTSF,
             'PatchTSMixer' : PatchTSMixer,
             'PatchConv' : PatchConv,
             'TSMixerChannelAttention' : TSMixerChannelAttention,
@@ -42,7 +43,7 @@ class Exp_Main(Exp_Basic):
             'ViTPatchConv': ViTPatchConv   
         }
 
-        self.non_transformer_model_list = {'DLinear', 'NLinear', 'Linear', 'TSMixer', 'GatedLTSF', 'PatchTSMixer', 'PatchConv', 'TSMixerChannelAttention', 'GatedTSMixer', 'AttentionMixer', 'SciNet', 'ViTPatchConv'}
+        self.non_transformer_model_list = {'DLinear', 'NLinear', 'Linear', 'TSMixer', 'TSMixerCCM', 'GatedLTSF', 'PatchTSMixer', 'PatchConv', 'TSMixerChannelAttention', 'GatedTSMixer', 'AttentionMixer', 'SciNet', 'ViTPatchConv'}
         model = model_dict[self.args.model].Model(self.args).float()
 
         if self.args.use_multi_gpu and self.args.use_gpu:

@@ -44,6 +44,7 @@ parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='l
 
 # ccm 
 parser.add_argument('--num_clusters', type=int, default=8, help='Number of clusters for CCM')
+parser.add_argument('--sigma', type=float, default=1.0, help='Sigma for computing Similarity matrix')
 
 # forecasting task
 parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
