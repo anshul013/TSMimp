@@ -50,10 +50,12 @@ class Model(nn.Module):
     def forward(self, x):
         # x: [Batch, Input length, Channel]
         x = self.rev_norm(x, 'norm')  # Normalize input
+        x = x.transpose(1, 2)  # [Batch, Channel, Input length]
         h_i = self.channel_mlp(x)  # Channel embeddings via MLP
 
         # Similarity calculation for clustering
         #S = torch.exp(-torch.norm(h_i.unsqueeze(1) - h_i.unsqueeze(2), dim=-1) ** 2 / (2 * 1.0 ** 2))  # Similarity matrix
+        
         # Normalize channel embeddings and cluster embeddings
         h_i_normalized = h_i / (h_i.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
         c_k_normalized = self.cluster_embeds / (self.cluster_embeds.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
@@ -78,29 +80,31 @@ class Model(nn.Module):
         self.cluster_embeds.data.copy_(updated_cluster_embeds.mean(dim=0))  # Update cluster embeds
 
         # Update Channel Embedding via Temporal Module
-        updated_channel_embeds = self.temporal_module(h_i)
+        H_updated = self.temporal_module(h_i)
 
-        # Mixing process using updated channel embeddings
-        x = updated_channel_embeds  # Use updated channel embeddings for mixing
-        x = self.rev_norm(x, 'norm')  # Normalize input X: [Batch, Input length, Channel]
-    
+        # Weight Averaging
+        theta = torch.einsum('bck,kd->bcd', p_ik, self.cluster_embeds)  # [Batch, Channels, d]
+
+        # Mixing process using updated channel embeddings and averaged weights
+        x = H_updated * theta  # Element-wise multiplication [Batch, Channels, d]
+        x = x.transpose(1, 2)  # [Batch, Input length, Channel]
+        # Apply TSMixer blocks
         for _ in range(self.num_blocks):
             x = self.mixer_block(x)
 
-        # Final linear layer applied on the transposed mixer's output
-        x = torch.swapaxes(x, 1, 2)
-
-        # Prepare tensor output with the correct prediction length
-        y = torch.zeros([x.size(0), x.size(1), self.pred_len], dtype=x.dtype).to(x.device)
+        # Final projection for each channel
+        y = torch.zeros([x.size(0), self.pred_len, self.channels], dtype=x.dtype, device=x.device)
     
         if self.individual_linear_layers:
+            x = x.transpose(1, 2)  # [Batch, Channel, Input length]
             for c in range(self.channels):
-                y[:, c, :] = self.output_linear_layers[c](x[:, c, :].clone())
+                y[:, :, c] = self.output_linear_layers[c](x[:, :, c])
         else:
-            y = self.output_linear_layers(x.clone())
-
-        y = torch.swapaxes(y, 1, 2)
+            y = self.output_linear_layers(x)
+        
+        y = y.transpose(1, 2)  # [Batch, Channel, Pred length]
         y = self.rev_norm(y, 'denorm')
+        y = y.transpose(1, 2)  # [Batch, Pred length, Channel]
 
         return y
 
