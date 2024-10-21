@@ -113,6 +113,7 @@ class MlpBlockFeatures(nn.Module):
 
 
 class MlpBlockTimesteps(nn.Module):
+    """MLP for timesteps"""
     def __init__(self, hidden_size, dropout_factor, activation):
         super(MlpBlockTimesteps, self).__init__()
         self.layer_norm = nn.LayerNorm(hidden_size)
