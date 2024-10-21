@@ -144,8 +144,8 @@ class MixerBlock(nn.Module):
         self.seq_len = seq_len
         self.num_blocks = num_blocks
 
-        self.timesteps_mixer = MlpBlockTimesteps(channels, dropout_factor, activation)
-        self.channels_mixer = MlpBlockFeatures(hidden_size, hidden_size, dropout_factor, activation, single_layer_mixer)
+        self.timesteps_mixer = MlpBlockTimesteps(seq_len, dropout_factor, activation)
+        self.channels_mixer = MlpBlockFeatures(channels, hidden_size, dropout_factor, activation, single_layer_mixer)
 
     def forward(self, x):
         for _ in range(self.num_blocks):
