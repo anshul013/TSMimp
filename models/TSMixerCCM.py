@@ -65,7 +65,7 @@ class Model(nn.Module):
         self.cluster_embeds.data.copy_(C.mean(dim=0))  # Update cluster embeds with mean across batch
 
         # Apply TSMixer blocks
-        H = self.mixer_block(h_i)  # [Batch, Channel, hidden_size]
+        H = self.mixer_block(h_i.transpose(1,2))  # [Batch, Channel, hidden_size]
 
         # Weight Averaging and Projection
         y = torch.zeros(x.size(0), self.channels, self.pred_len, device=x.device)
