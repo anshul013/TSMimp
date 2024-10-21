@@ -65,7 +65,7 @@ class Model(nn.Module):
         self.cluster_embeds.data.copy_(C.mean(dim=0))  # Update cluster embeds with mean across batch
 
         # Apply TSMixer blocks
-        H = self.mixer_block(h_i.transpose(1,2))  # [Batch, Channel, hidden_size]
+        H = self.mixer_block(h_i)  # [Batch, Channel, hidden_size]
 
         # Weight Averaging and Projection
         y = torch.zeros(x.size(0), self.channels, self.pred_len, device=x.device)
@@ -95,11 +95,12 @@ class MlpBlockFeatures(nn.Module):
         elif activation == "relu":
             self.activation_layer = nn.ReLU()
         else:
-            self.activation_layer = None
+            self.activation_layer = nn.Identity()
         self.dropout_layer = nn.Dropout(dropout_factor)
 
     def forward(self, x):
-        # x shape: [Batch, seq_len, channels]
+        # x shape: [Batch, Channel, hidden_size]
+        x = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
         y = self.layer_norm(x)
         y = self.linear_layer1(y)
         if self.activation_layer is not None:
@@ -108,7 +109,7 @@ class MlpBlockFeatures(nn.Module):
             y = self.dropout_layer(y)
             y = self.linear_layer2(y)
         y = self.dropout_layer(y)
-        return x + y
+        return (x + y).transpose(1, 2)  # Return to [Batch, Channel, hidden_size]
 
 
 class MlpBlockTimesteps(nn.Module):
@@ -125,13 +126,13 @@ class MlpBlockTimesteps(nn.Module):
         self.dropout_layer = nn.Dropout(dropout_factor)
 
     def forward(self, x):
-        # x shape: [Batch, hidden_size, Channel]
-        x = x.permute(0, 2, 1)  # [Batch, Channel, hidden_size]
+        # x shape: [Batch, Channel, hidden_size]
+        x = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
         y = self.layer_norm(x)
         y = self.linear_layer(y)
         y = self.activation_layer(y)
         y = self.dropout_layer(y)
-        return (x + y).permute(0, 2, 1)  # Return to [Batch, hidden_size, Channel]
+        return (x + y).transpose(1, 2)  # Return to [Batch, Channel, hidden_size]
 
 class MixerBlock(nn.Module):
     def __init__(self, channels, hidden_size, seq_len, dropout_factor, activation, single_layer_mixer, num_blocks):
@@ -146,11 +147,10 @@ class MixerBlock(nn.Module):
 
     def forward(self, x):
         # x shape: [Batch, Channel, hidden_size]
-        x = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
         for _ in range(self.num_blocks):
             # Timesteps mixing
             x = self.timesteps_mixer(x)
             # Features mixing
-            x = self.channels_mixer(x.transpose(1, 2)).transpose(1, 2)
-        return x.transpose(1, 2)  # Return to [Batch, Channel, hidden_size]
+            x = self.channels_mixer(x)
+        return x  # [Batch, Channel, hidden_size]
     
