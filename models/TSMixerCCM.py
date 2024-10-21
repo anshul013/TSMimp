@@ -1,123 +1,82 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from models.Rev_in import RevIN
 
 class Model(nn.Module):
-    """
-    Time Series Mixer model with Channel Clustering Module (CCM)
-    """
     def __init__(self, configs):
         super(Model, self).__init__()
-        # Defining the reversible instance normalization
-        self.num_blocks = configs.num_blocks
-        self.mixer_block = MixerBlock(configs.enc_in, configs.hidden_size,
-                                      configs.seq_len, configs.dropout,
-                                      configs.activation, configs.single_layer_mixer)
-        self.channels = configs.enc_in
+        self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
+        self.channels = configs.enc_in
+        self.hidden_size = configs.hidden_size
+        self.num_clusters = configs.num_clusters
+        self.num_blocks = configs.num_blocks
+
         self.rev_norm = RevIN(self.channels, affine=configs.affine)
 
-        # Cluster Assigner and Embeddings
-        self.num_clusters = configs.num_clusters  # K clusters
-        self.hidden_size = configs.hidden_size  # Embedding size d
-        self.cluster_embeds = nn.Parameter(torch.randn(self.num_clusters, self.hidden_size))  # Cluster prototypes
+        self.channel_mlp = nn.Sequential(
+            nn.Linear(self.seq_len, self.hidden_size),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size, self.hidden_size)
+        )
 
-        # Hyperparameter σ for Similarity Matrix
-        self.sigma = configs.sigma
+        self.cluster_embeds = nn.Parameter(torch.randn(self.num_clusters, self.hidden_size))
 
-        # Cross Attention Weights (W_q, W_k, W_v)
         self.W_q = nn.Linear(self.hidden_size, self.hidden_size)
         self.W_k = nn.Linear(self.hidden_size, self.hidden_size)
         self.W_v = nn.Linear(self.hidden_size, self.hidden_size)
 
-        # Temporal Module for updating Channel Embedding
-        self.temporal_module = TemporalModule(self.hidden_size)  # Define a temporal module for embedding update
+        self.mixer_block = MixerBlock(self.channels, self.hidden_size,
+                                      self.seq_len, configs.dropout,
+                                      configs.activation, configs.single_layer_mixer,
+                                      self.num_blocks)
 
-        # Linear layers for individual or shared output
-        self.individual_linear_layers = configs.individual
-        if self.individual_linear_layers:
-            self.output_linear_layers = nn.ModuleList([nn.Linear(configs.seq_len, configs.pred_len) for _ in range(self.channels)])
-        else:
-            self.output_linear_layers = nn.Linear(configs.seq_len, configs.pred_len)
-
-        # MLP for channel embeddings in the cluster assigner
-        self.channel_mlp = nn.Sequential(
-            nn.Linear(configs.seq_len, configs.hidden_size),
-            nn.ReLU(),
-            nn.Linear(configs.hidden_size, configs.hidden_size)
-        )
+        # New output projection layers for each cluster
+        self.output_projections = nn.ModuleList([
+            nn.Linear(self.hidden_size, self.pred_len) for _ in range(self.num_clusters)
+        ])
 
     def forward(self, x):
         # x: [Batch, Input length, Channel]
         x = self.rev_norm(x, 'norm')  # Normalize input
         x = x.transpose(1, 2)  # [Batch, Channel, Input length]
-        h_i = self.channel_mlp(x)  # Channel embeddings via MLP
+        h_i = self.channel_mlp(x)  # Channel embeddings via MLP [Batch, Channel, hidden_size]
 
-        # Similarity calculation for clustering
-        #S = torch.exp(-torch.norm(h_i.unsqueeze(1) - h_i.unsqueeze(2), dim=-1) ** 2 / (2 * 1.0 ** 2))  # Similarity matrix
-        
-        # Normalize channel embeddings and cluster embeddings
-        h_i_normalized = h_i / (h_i.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
-        c_k_normalized = self.cluster_embeds / (self.cluster_embeds.norm(dim=-1, keepdim=True) + 1e-8)  # Prevent division by zero
+        # Compute clustering probability matrix P
+        c_k_norm = F.normalize(self.cluster_embeds, dim=-1)
+        h_i_norm = F.normalize(h_i, dim=-1)
+        p_ik = F.softmax(torch.matmul(h_i_norm, c_k_norm.t()), dim=-1)  # [Batch, Channel, K]
 
-        # Compute clustering probability matrix P using dot product and softmax
-        p_ik = torch.softmax(torch.matmul(h_i_normalized, c_k_normalized.T), dim=-1)  # [Batch, Channels, K]
+        # Sample Clustering Membership Matrix M
+        M = torch.bernoulli(p_ik)  # [Batch, Channel, K]
 
-        # Sample clustering membership matrix M using Bernoulli sampling
-        M = torch.bernoulli(p_ik)  # Sampling clustering membership matrix
-
-       # Update Cluster Embedding C via Cross Attention
+        # Update Cluster Embedding C via Cross Attention
         Q = self.W_q(self.cluster_embeds)  # [K, d]
-        K = self.W_k(h_i)  # [Batch, Channels, d]
-        V = self.W_v(h_i)  # [Batch, Channels, d]
+        K = self.W_k(h_i)  # [Batch, Channel, d]
+        V = self.W_v(h_i)  # [Batch, Channel, d]
 
-        # Attention mechanism: dot product of Q and K, scaling
-        attention_scores = torch.exp(torch.matmul(Q, K.transpose(-1, -2)) / (self.hidden_size ** 0.5))  # [Batch, K, Channels]
-    
-        # Apply membership matrix M
-        M_expanded = M.permute(0, 2, 1)  # [Batch, K, Channels]
-        attention_scores = attention_scores * M_expanded  # [Batch, K, Channels]
-    
-        # Apply softmax
-        attention_weights = torch.softmax(attention_scores, dim=-1)  # [Batch, K, Channels]
-    
-        # Apply attention weights to V
-        attention_output = torch.matmul(attention_weights, V)  # [Batch, K, d]
+        attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / torch.sqrt(torch.tensor(self.hidden_size).float())  # [Batch, K, Channel]
+        attention_exp = torch.exp(attention_scores)
+        attention_masked = attention_exp * M.transpose(1, 2)  # [Batch, K, Channel]
+        attention_weights = attention_masked / attention_masked.sum(dim=-1, keepdim=True)  # Normalize
 
-        # Update cluster embeddings using p_ik
-        #p_ik_sum = p_ik.sum(dim=1, keepdim=True)  # [Batch, 1, K]
-        #updated_cluster_embeds = (p_ik_sum.transpose(1, 2) * attention_output).mean(dim=0)  # [K, d]
-        self.cluster_embeds.data.copy_(attention_output.mean(dim=0))  # Update cluster embeds with across Batch dimension usng mean
+        C = torch.matmul(attention_weights, V)  # [Batch, K, d]
+        self.cluster_embeds.data.copy_(C.mean(dim=0))  # Update cluster embeds with mean across batch
 
-        # Update Channel Embedding via Temporal Module
-        H_updated = self.temporal_module(h_i)
-
-        # Weight Averaging
-        theta = torch.einsum('bck,kd->bcd', p_ik, self.cluster_embeds)  # [Batch, Channels, d]
-
-        # Mixing process using updated channel embeddings and averaged weights
-        x = H_updated * theta  # Element-wise multiplication [Batch, Channels, d]
-        x = x.transpose(1, 2)  # [Batch, Input length, Channel]
         # Apply TSMixer blocks
-        for _ in range(self.num_blocks):
-            x = self.mixer_block(x)
+        H = self.mixer_block(h_i)  # [Batch, Channel, hidden_size]
 
-        # Final projection for each channel
-        y = torch.zeros([x.size(0), self.pred_len, self.channels], dtype=x.dtype, device=x.device)
-    
-        if self.individual_linear_layers:
-            x = x.transpose(1, 2)  # [Batch, Channel, Input length]
-            for c in range(self.channels):
-                y[:, :, c] = self.output_linear_layers[c](x[:, :, c])
-        else:
-            y = self.output_linear_layers(x)
-        
-        y = y.transpose(1, 2)  # [Batch, Channel, Pred length]
+        # Weight Averaging and Projection
+        y = torch.zeros(x.size(0), self.channels, self.pred_len, device=x.device)
+        for i in range(self.channels):
+            theta_i = torch.sum(p_ik[:, i, :].unsqueeze(-1) * self.cluster_embeds, dim=1)  # [Batch, hidden_size]
+            y[:, i, :] = self.output_projections[i](H[:, i, :] * theta_i)
+
+        y = y.transpose(1, 2)  # [Batch, pred_len, Channel]
         y = self.rev_norm(y, 'denorm')
-        y = y.transpose(1, 2)  # [Batch, Pred length, Channel]
-
+        
         return y
-
 
 
 class MlpBlockFeatures(nn.Module):
@@ -178,34 +137,21 @@ class MlpBlockTimesteps(nn.Module):
 
 
 class MixerBlock(nn.Module):
-    """Mixer block layer"""
-    def __init__(self, channels, features_block_mlp_dims, seq_len, dropout_factor, activation, single_layer_mixer):
+    def __init__(self, channels, hidden_size, seq_len, dropout_factor, activation, single_layer_mixer, num_blocks):
         super(MixerBlock, self).__init__()
         self.channels = channels
+        self.hidden_size = hidden_size
         self.seq_len = seq_len
-        # Timesteps mixing block 
-        self.timesteps_mixer = MlpBlockTimesteps(seq_len, dropout_factor, activation)
-        # Features mixing block 
-        self.channels_mixer = MlpBlockFeatures(channels, features_block_mlp_dims, dropout_factor, activation, single_layer_mixer)
+        self.num_blocks = num_blocks
+
+        self.timesteps_mixer = MlpBlockTimesteps(channels, dropout_factor, activation)
+        self.channels_mixer = MlpBlockFeatures(hidden_size, hidden_size, dropout_factor, activation, single_layer_mixer)
 
     def forward(self, x):
-        y = self.timesteps_mixer(x)
-        y = self.channels_mixer(y)
+        for _ in range(self.num_blocks):
+            # Timesteps mixing
+            y = self.timesteps_mixer(x.transpose(1, 2)).transpose(1, 2)
+            # Features mixing
+            y = self.channels_mixer(y)
         return y
-
-
-class TemporalModule(nn.Module):
-    """
-    Temporal Module for updating channel embeddings
-    """
-    def __init__(self, hidden_size):
-        super(TemporalModule, self).__init__()
-        self.temporal_mlp = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size)
-        )
-
-    def forward(self, x):
-        return self.temporal_mlp(x)
     
