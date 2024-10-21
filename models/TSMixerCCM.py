@@ -112,10 +112,10 @@ class MlpBlockFeatures(nn.Module):
 
 
 class MlpBlockTimesteps(nn.Module):
-    def __init__(self, channels, dropout_factor, activation):
+    def __init__(self, hidden_size, dropout_factor, activation):
         super(MlpBlockTimesteps, self).__init__()
-        self.layer_norm = nn.LayerNorm(channels)
-        self.linear_layer = nn.Linear(channels, channels)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.linear_layer = nn.Linear(hidden_size, hidden_size)
         if activation == "gelu":
             self.activation_layer = nn.GELU()
         elif activation == "relu":
@@ -126,12 +126,12 @@ class MlpBlockTimesteps(nn.Module):
 
     def forward(self, x):
         # x shape: [Batch, hidden_size, Channel]
-        x = x.transpose(1, 2)  # [Batch, Channel, hidden_size]
+        x = x.permute(0, 2, 1)  # [Batch, Channel, hidden_size]
         y = self.layer_norm(x)
         y = self.linear_layer(y)
         y = self.activation_layer(y)
         y = self.dropout_layer(y)
-        return (x + y).transpose(1, 2)  # Return to [Batch, hidden_size, Channel]
+        return (x + y).permute(0, 2, 1)  # Return to [Batch, hidden_size, Channel]
 
 class MixerBlock(nn.Module):
     def __init__(self, channels, hidden_size, seq_len, dropout_factor, activation, single_layer_mixer, num_blocks):
@@ -141,16 +141,16 @@ class MixerBlock(nn.Module):
         self.seq_len = seq_len
         self.num_blocks = num_blocks
 
-        self.timesteps_mixer = MlpBlockTimesteps(channels, dropout_factor, activation)
-        self.channels_mixer = MlpBlockFeatures(hidden_size, hidden_size, dropout_factor, activation, single_layer_mixer)
+        self.timesteps_mixer = MlpBlockTimesteps(hidden_size, dropout_factor, activation)
+        self.channels_mixer = MlpBlockFeatures(channels, hidden_size, dropout_factor, activation, single_layer_mixer)
 
     def forward(self, x):
         # x shape: [Batch, Channel, hidden_size]
-        y = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
+        x = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
         for _ in range(self.num_blocks):
             # Timesteps mixing
-            y = self.timesteps_mixer(y)
+            x = self.timesteps_mixer(x)
             # Features mixing
-            y = self.channels_mixer(y)
-        return y.transpose(1, 2)  # Return to [Batch, Channel, hidden_size]
+            x = self.channels_mixer(x.transpose(1, 2)).transpose(1, 2)
+        return x.transpose(1, 2)  # Return to [Batch, Channel, hidden_size]
     
