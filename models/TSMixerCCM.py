@@ -83,7 +83,7 @@ class MlpBlockFeatures(nn.Module):
     """MLP for features"""
     def __init__(self, channels, mlp_dim, dropout_factor, activation, single_layer_mixer):
         super(MlpBlockFeatures, self).__init__()
-        self.normalization_layer = nn.BatchNorm1d(channels)
+        self.layer_norm = nn.LayerNorm(channels)
         self.single_layer_mixer = single_layer_mixer
         if self.single_layer_mixer:
             self.linear_layer1 = nn.Linear(channels, channels)
@@ -99,9 +99,8 @@ class MlpBlockFeatures(nn.Module):
         self.dropout_layer = nn.Dropout(dropout_factor)
 
     def forward(self, x):
-        y = torch.swapaxes(x, 1, 2)
-        y = self.normalization_layer(y)
-        y = torch.swapaxes(y, 1, 2)
+        # x shape: [Batch, seq_len, channels]
+        y = self.layer_norm(x)
         y = self.linear_layer1(y)
         if self.activation_layer is not None:
             y = self.activation_layer(y)
@@ -113,11 +112,11 @@ class MlpBlockFeatures(nn.Module):
 
 
 class MlpBlockTimesteps(nn.Module):
-    """MLP for timesteps with 1 layer"""
-    def __init__(self, seq_len, dropout_factor, activation):
+    """MLP for timesteps"""
+    def __init__(self, hidden_size, dropout_factor, activation):
         super(MlpBlockTimesteps, self).__init__()
-        self.normalization_layer = nn.BatchNorm1d(seq_len)
-        self.linear_layer = nn.Linear(seq_len, seq_len)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.linear_layer = nn.Linear(hidden_size, hidden_size)
         if activation == "gelu":
             self.activation_layer = nn.GELU()
         elif activation == "relu":
@@ -127,12 +126,11 @@ class MlpBlockTimesteps(nn.Module):
         self.dropout_layer = nn.Dropout(dropout_factor)
 
     def forward(self, x):
-        y = self.normalization_layer(x)
-        y = torch.swapaxes(y, 1, 2)
+        # x shape: [Batch, seq_len, hidden_size]
+        y = self.layer_norm(x)
         y = self.linear_layer(y)
         y = self.activation_layer(y)
         y = self.dropout_layer(y)
-        y = torch.swapaxes(y, 1, 2)
         return x + y
 
 
@@ -148,10 +146,12 @@ class MixerBlock(nn.Module):
         self.channels_mixer = MlpBlockFeatures(channels, hidden_size, dropout_factor, activation, single_layer_mixer)
 
     def forward(self, x):
+        # x shape: [Batch, Channel, hidden_size]
+        y = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
         for _ in range(self.num_blocks):
             # Timesteps mixing
-            y = self.timesteps_mixer(x.transpose(1, 2)).transpose(1, 2)
+            y = self.timesteps_mixer(y)
             # Features mixing
-            y = self.channels_mixer(y)
-        return y
+            y = self.channels_mixer(y.transpose(1, 2)).transpose(1, 2)
+        return y.transpose(1, 2)  # Return to [Batch, Channel, hidden_size]
     
