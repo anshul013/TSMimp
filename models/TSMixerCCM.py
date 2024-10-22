@@ -117,7 +117,7 @@ class MlpBlockTimesteps(nn.Module):
     """MLP for timesteps"""
     def __init__(self, hidden_size, dropout_factor, activation):
         super(MlpBlockTimesteps, self).__init__()
-        self.layer_norm = nn.BatchNorm1d(hidden_size)
+        self.batch_norm = nn.BatchNorm1d(hidden_size)
         self.linear_layer = nn.Linear(hidden_size, hidden_size)
         if activation == "gelu":
             self.activation_layer = nn.GELU()
