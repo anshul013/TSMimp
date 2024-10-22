@@ -129,8 +129,8 @@ class MlpBlockTimesteps(nn.Module):
 
     def forward(self, x):
        # x shape: [Batch, Channel, hidden_size]
+        x = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
         y = self.batch_norm(x)
-        y = y.transpose(1, 2)  # [Batch, hidden_size, Channel]
         y = self.linear_layer(y)
         y = y.transpose(1, 2)  # [Batch, Channel, hidden_size]
         y = self.activation_layer(y)
