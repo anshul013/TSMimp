@@ -83,7 +83,7 @@ class MlpBlockFeatures(nn.Module):
     """MLP for features"""
     def __init__(self, channels, mlp_dim, dropout_factor, activation, single_layer_mixer):
         super(MlpBlockFeatures, self).__init__()
-        self.layer_norm = nn.LayerNorm(channels)
+        self.batch_norm = nn.BatchNorm1d(channels)
         self.single_layer_mixer = single_layer_mixer
         if self.single_layer_mixer:
             self.linear_layer1 = nn.Linear(channels, channels)
@@ -100,8 +100,8 @@ class MlpBlockFeatures(nn.Module):
 
     def forward(self, x):
         # x shape: [Batch, Channel, hidden_size]
-        x = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
-        y = self.layer_norm(x)
+        y = self.batch_norm(x)
+        y = y.transpose(1, 2)  # [Batch, hidden_size, Channel]
         y = self.linear_layer1(y)
         if self.activation_layer is not None:
             y = self.activation_layer(y)
@@ -109,14 +109,15 @@ class MlpBlockFeatures(nn.Module):
             y = self.dropout_layer(y)
             y = self.linear_layer2(y)
         y = self.dropout_layer(y)
-        return (x + y).transpose(1, 2)  # Return to [Batch, Channel, hidden_size]
+        y = y.transpose(1, 2)  # [Batch, Channel, hidden_size]
+        return x + y  # Return [Batch, Channel, hidden_size]
 
 
 class MlpBlockTimesteps(nn.Module):
     """MLP for timesteps"""
     def __init__(self, hidden_size, dropout_factor, activation):
         super(MlpBlockTimesteps, self).__init__()
-        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.layer_norm = nn.BatchNorm1d(hidden_size)
         self.linear_layer = nn.Linear(hidden_size, hidden_size)
         if activation == "gelu":
             self.activation_layer = nn.GELU()
@@ -127,13 +128,14 @@ class MlpBlockTimesteps(nn.Module):
         self.dropout_layer = nn.Dropout(dropout_factor)
 
     def forward(self, x):
-        # x shape: [Batch, Channel, hidden_size]
-        x = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
-        y = self.layer_norm(x)
+       # x shape: [Batch, Channel, hidden_size]
+        y = self.batch_norm(x)
+        y = y.transpose(1, 2)  # [Batch, hidden_size, Channel]
         y = self.linear_layer(y)
+        y = y.transpose(1, 2)  # [Batch, Channel, hidden_size]
         y = self.activation_layer(y)
         y = self.dropout_layer(y)
-        return (x + y).transpose(1, 2)  # Return to [Batch, Channel, hidden_size]
+        return x + y  # Return [Batch, Channel, hidden_size]
 
 class MixerBlock(nn.Module):
     def __init__(self, channels, hidden_size, seq_len, dropout_factor, activation, single_layer_mixer, num_blocks):
@@ -154,4 +156,3 @@ class MixerBlock(nn.Module):
             # Features mixing
             x = self.channels_mixer(x)
         return x  # [Batch, Channel, hidden_size]
-    
