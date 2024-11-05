@@ -104,6 +104,7 @@ class Model(nn.Module):
         y = y.transpose(1, 2)  # [Batch, pred_len, Channel]
         y = self.rev_norm(y, 'denorm')
         print(f"Final output shape: {y.shape}")
+        print(f"Final output: {y}")
 
         return y
 
