@@ -39,7 +39,7 @@ class Model(nn.Module):
 
         # New output projection layers for each cluster
         self.output_projections = nn.ModuleList([
-            nn.Linear(self.hidden_size, self.pred_len) for _ in range(self.num_clusters)
+            nn.Linear(self.hidden_size, self.pred_len) for _ in range(self.channels)
         ])
 
     def forward(self, x):
@@ -85,10 +85,21 @@ class Model(nn.Module):
         print(f"After mixer_block shape: {H.shape}")
 
         # Weight Averaging and Projection
+        print("\nWeight Averaging and Projection:")
+        print(f"H shape: {H.shape}")
+        print(f"p_ik shape: {p_ik.shape}")
+        print(f"cluster_embeds shape: {self.cluster_embeds.shape}")
+
         y = torch.zeros(x.size(0), self.channels, self.pred_len, device=x.device)
         for i in range(self.channels):
             theta_i = torch.sum(p_ik[:, i, :].unsqueeze(-1) * self.cluster_embeds, dim=1)  # [Batch, hidden_size]
+            print(f"theta_i shape for channel {i}: {theta_i.shape}")
+            print(f"H[:, i, :] shape: {H[:, i, :].shape}")
+            
             y[:, i, :] = self.output_projections[i](H[:, i, :] * theta_i)
+            print(f"Output for channel {i} shape: {y[:, i, :].shape}")
+            # theta_i = torch.sum(p_ik[:, i, :].unsqueeze(-1) * self.cluster_embeds, dim=1)  # [Batch, hidden_size]
+            # y[:, i, :] = self.output_projections[i](H[:, i, :] * theta_i)
 
         y = y.transpose(1, 2)  # [Batch, pred_len, Channel]
         y = self.rev_norm(y, 'denorm')
