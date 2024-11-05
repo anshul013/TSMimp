@@ -165,11 +165,14 @@ class MlpBlockTimesteps(nn.Module):
         print("\nMlpBlockTimesteps:")
         print(f"Input shape: {x.shape}")
         
-        # x = x.transpose(1, 2)
-        # print(f"After transpose shape: {x.shape}")
+        x = x.transpose(1, 2)
+        print(f"After transpose shape: {x.shape}")
         
         y = self.batch_norm(x)
         print(f"After batch_norm shape: {y.shape}")
+
+        y = y.transpose(1, 2)
+        print(f"After transpose shape: {y.shape}")
         
         y = self.linear_layer(y)
         print(f"After linear shape: {y.shape}")
