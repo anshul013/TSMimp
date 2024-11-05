@@ -6,10 +6,10 @@ from models.Rev_in import RevIN
 class Model(nn.Module):
     def __init__(self, configs):
         super(Model, self).__init__()
-        print("\nModel initialization:")
-        print(f"seq_len: {configs.seq_len}, pred_len: {configs.pred_len}")
-        print(f"channels: {configs.enc_in}, hidden_size: {configs.hidden_size}")
-        print(f"num_clusters: {configs.num_clusters}, num_blocks: {configs.num_blocks}")
+        # print("\nModel initialization:")
+        # print(f"seq_len: {configs.seq_len}, pred_len: {configs.pred_len}")
+        # print(f"channels: {configs.enc_in}, hidden_size: {configs.hidden_size}")
+        # print(f"num_clusters: {configs.num_clusters}, num_blocks: {configs.num_blocks}")
 
         self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
@@ -61,17 +61,17 @@ class Model(nn.Module):
 
     def forward(self, x):
         # x: [Batch, Input length, Channel]
-        print("\nModel forward:")
-        print(f"Input shape: {x.shape}")
+        # print("\nModel forward:")
+        # print(f"Input shape: {x.shape}")
         
         x = self.rev_norm(x, 'norm')
-        print(f"After rev_norm shape: {x.shape}")
+        # print(f"After rev_norm shape: {x.shape}")
         
         x = x.transpose(1, 2)
-        print(f"After transpose shape: {x.shape}")
+        # print(f"After transpose shape: {x.shape}")
         
         h_i = self.channel_mlp(x)
-        print(f"After channel_mlp shape: {h_i.shape}")
+        # print(f"After channel_mlp shape: {h_i.shape}")
         # x = self.rev_norm(x, 'norm')  # Normalize input
         # x = x.transpose(1, 2)  # [Batch, Channel, Input length]
         # h_i = self.channel_mlp(x)  # Channel embeddings via MLP [Batch, Channel, hidden_size]
@@ -102,74 +102,74 @@ class Model(nn.Module):
         Q = self.W_q(self.cluster_embeds)  # [num_clusters, hidden_size]
         K = self.W_k(h_i)  # [batch, channels, hidden_size]
         V = self.W_v(h_i)  # [batch, channels, hidden_size]
-        print(f"Q shape: {Q.shape}")
-        print(f"K shape: {K.shape}")
-        print(f"V shape: {V.shape}")
+        # print(f"Q shape: {Q.shape}")
+        # print(f"K shape: {K.shape}")
+        # print(f"V shape: {V.shape}")
         # Scale factor for attention
         scale = torch.sqrt(torch.tensor(self.hidden_size, dtype=torch.float32, device=x.device))
         # print(f"scale: {scale}")
         # Compute attention scores with scaled dot product
         attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / scale  # [num_clusters, batch, channels]
-        print(f"attention_scores shape: {attention_scores.shape}")
+        # print(f"attention_scores shape: {attention_scores.shape}")
         # Apply temperature scaling to prevent extreme values
         temperature = 1.0
         attention_scores = attention_scores / temperature
-        print(f"attention_scores shape: {attention_scores.shape}")
+        # print(f"attention_scores shape: {attention_scores.shape}")
 
         # Clip attention scores to prevent overflow in exp
         attention_scores = torch.clamp(attention_scores, min=-10.0, max=10.0)
-        print(f"attention_scores shape: {attention_scores.shape}")
+        # print(f"attention_scores shape: {attention_scores.shape}")
 
         # Compute attention weights with numerical stability
         attention_exp = torch.exp(attention_scores)
         attention_masked = attention_exp * M.transpose(1, 2)
-        print(f"attention_masked shape: {attention_masked.shape}")
+        # print(f"attention_masked shape: {attention_masked.shape}")
         # Add small epsilon to prevent division by zero
         eps = 1e-10
         attention_weights = attention_masked / (attention_masked.sum(dim=-1, keepdim=True) + eps)
-        print(f"attention_weights shape: {attention_weights.shape}")
+        # print(f"attention_weights shape: {attention_weights.shape}")
         # Compute new cluster embeddings
         C = torch.matmul(attention_weights, V)  # [num_clusters, batch, hidden_size]
-        print(f"C shape: {C.shape}")
+        # print(f"C shape: {C.shape}")
         # Take mean across batch dimension with gradient clipping
         C_mean = torch.clamp(C.mean(dim=0), min=-100.0, max=100.0)  # [num_clusters, hidden_size]
-        print(f"C_mean shape: {C_mean.shape}")
-        print(f"C_mean: {C_mean}")
+        # print(f"C_mean shape: {C_mean.shape}")
+        # print(f"C_mean: {C_mean}")
         # Update cluster embeddings with momentum
         momentum = 0.9
         new_embeds = momentum * self.cluster_embeds + (1 - momentum) * C_mean
-        print(f"new_embeds shape: {new_embeds.shape}")
-        print(f"new_embeds: {new_embeds}")
+        # print(f"new_embeds shape: {new_embeds.shape}")
+        # print(f"new_embeds: {new_embeds}")
         self.cluster_embeds.data.copy_(new_embeds)
-        print(f"cluster_embeds shape: {self.cluster_embeds.shape}")
-        print(f"cluster_embeds: {self.cluster_embeds}")    
+        # print(f"cluster_embeds shape: {self.cluster_embeds.shape}")
+        # print(f"cluster_embeds: {self.cluster_embeds}")    
         # Apply TSMixer blocks
         H = self.mixer_block(h_i)  # [Batch, Channel, hidden_size]
-        print(f"After mixer_block shape: {H.shape}")
-        print(f"H: {H}")
-        print(f"p_ik: {p_ik}")
-        print(f"cluster_embeds: {self.cluster_embeds}")
+        # print(f"After mixer_block shape: {H.shape}")
+        # print(f"H: {H}")
+        # print(f"p_ik: {p_ik}")
+        # print(f"cluster_embeds: {self.cluster_embeds}")
         # Weight Averaging and Projection
-        print("\nWeight Averaging and Projection:")
-        print(f"H shape: {H.shape}")
-        print(f"p_ik shape: {p_ik.shape}")
-        print(f"cluster_embeds shape: {self.cluster_embeds.shape}")
+        # print("\nWeight Averaging and Projection:")
+        # print(f"H shape: {H.shape}")
+        # print(f"p_ik shape: {p_ik.shape}")
+        # print(f"cluster_embeds shape: {self.cluster_embeds.shape}")
 
         y = torch.zeros(x.size(0), self.channels, self.pred_len, device=x.device)
         for i in range(self.channels):
             theta_i = torch.sum(p_ik[:, i, :].unsqueeze(-1) * self.cluster_embeds, dim=1)  # [Batch, hidden_size]
-            print(f"theta_i shape for channel {i}: {theta_i.shape}")
-            print(f"H[:, i, :] shape: {H[:, i, :].shape}")
+            # print(f"theta_i shape for channel {i}: {theta_i.shape}")
+            # print(f"H[:, i, :] shape: {H[:, i, :].shape}")
             
             y[:, i, :] = self.output_projections[i](H[:, i, :] * theta_i)
-            print(f"Output for channel {i} shape: {y[:, i, :].shape}")
+            # print(f"Output for channel {i} shape: {y[:, i, :].shape}")
             # theta_i = torch.sum(p_ik[:, i, :].unsqueeze(-1) * self.cluster_embeds, dim=1)  # [Batch, hidden_size]
             # y[:, i, :] = self.output_projections[i](H[:, i, :] * theta_i)
 
         y = y.transpose(1, 2)  # [Batch, pred_len, Channel]
         y = self.rev_norm(y, 'denorm')
-        print(f"Final output shape: {y.shape}")
-        print(f"Final output: {y}")
+        # print(f"Final output shape: {y.shape}")
+        # print(f"Final output: {y}")
 
         return y
 
@@ -195,36 +195,36 @@ class MlpBlockFeatures(nn.Module):
 
     def forward(self, x):
         # x shape: [Batch, Channel, hidden_size]
-        print("\nMlpBlockFeatures:")
-        print(f"Input shape: {x.shape}")
+        # print("\nMlpBlockFeatures:")
+        # print(f"Input shape: {x.shape}")
         
         x = x.transpose(1, 2)
-        print(f"After transpose shape of x: {x.shape}")
+        # print(f"After transpose shape of x: {x.shape}")
 
         y = self.batch_norm(x)
-        print(f"After batch_norm shape: {y.shape}")
+        # print(f"After batch_norm shape: {y.shape}")
         
         y = y.transpose(1, 2)
-        print(f"After transpose shape: {y.shape}")
+        # print(f"After transpose shape: {y.shape}")
         
         y = self.linear_layer1(y)
-        print(f"After linear1 shape: {y.shape}")
+        # print(f"After linear1 shape: {y.shape}")
         
         if self.activation_layer is not None:
             y = self.activation_layer(y)
-            print(f"After activation shape: {y.shape}")
+            # print(f"After activation shape: {y.shape}")
         
         if not self.single_layer_mixer:
             y = self.dropout_layer(y)
             y = self.linear_layer2(y)
-            print(f"After linear2 shape: {y.shape}")
+            # print(f"After linear2 shape: {y.shape}")
         
         y = self.dropout_layer(y)
         y = y.transpose(1, 2)
         # x = x.transpose(1, 2)
         # print(f"After transpose shape of x: {x.shape}")
 
-        print(f"Final output shape: {y.shape}")
+        # print(f"Final output shape: {y.shape}")
 
         return x + y
 
@@ -245,37 +245,37 @@ class MlpBlockTimesteps(nn.Module):
 
     def forward(self, x):
        # x shape: [Batch, Channel, hidden_size]
-        print("\nMlpBlockTimesteps:")
-        print(f"Input shape: {x.shape}")
+        # print("\nMlpBlockTimesteps:")
+        # print(f"Input shape: {x.shape}")
         
         x = x.transpose(1, 2)
-        print(f"After transpose shape: {x.shape}")
+        # print(f"After transpose shape: {x.shape}")
         
         y = self.batch_norm(x)
-        print(f"After batch_norm shape: {y.shape}")
+        # print(f"After batch_norm shape: {y.shape}")
 
         y = y.transpose(1, 2)
-        print(f"After transpose shape: {y.shape}")
+        # print(f"After transpose shape: {y.shape}")
         
         y = self.linear_layer(y)
-        print(f"After linear shape: {y.shape}")
+        # print(f"After linear shape: {y.shape}")
         
         y = y.transpose(1, 2)
-        print(f"After second transpose shape: {y.shape}")
+        # print(f"After second transpose shape: {y.shape}")
         
         y = self.activation_layer(y)
-        print(f"After activation shape: {y.shape}")
+        # print(f"After activation shape: {y.shape}")
         
         y = self.dropout_layer(y)
-        print(f"After dropout shape: {y.shape}")
+        # print(f"After dropout shape: {y.shape}")
         
         return x + y
 
 class MixerBlock(nn.Module):
     def __init__(self, channels, hidden_size, seq_len, dropout_factor, activation, single_layer_mixer, num_blocks):
         super(MixerBlock, self).__init__()
-        print(f"\nMixerBlock initialization:")
-        print(f"channels: {channels}, hidden_size: {hidden_size}, seq_len: {seq_len}")
+        # print(f"\nMixerBlock initialization:")
+        # print(f"channels: {channels}, hidden_size: {hidden_size}, seq_len: {seq_len}")
         self.channels = channels
         self.hidden_size = hidden_size
         self.seq_len = seq_len
@@ -286,15 +286,15 @@ class MixerBlock(nn.Module):
 
     def forward(self, x):
         # x shape: [Batch, Channel, hidden_size]
-        print("\nMixerBlock forward:")
-        print(f"Input shape: {x.shape}")
+        # print("\nMixerBlock forward:")
+        # print(f"Input shape: {x.shape}")
         
         for i in range(self.num_blocks):
-            print(f"\nBlock {i + 1}:")
+            # print(f"\nBlock {i + 1}:")
             x = self.timesteps_mixer(x)
-            print(f"After timesteps_mixer shape: {x.shape}")
+            # print(f"After timesteps_mixer shape: {x.shape}")
             
             x = self.channels_mixer(x)
-            print(f"After channels_mixer shape: {x.shape}")
+            # print(f"After channels_mixer shape: {x.shape}")
         
         return x
