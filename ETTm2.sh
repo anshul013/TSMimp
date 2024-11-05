@@ -6,12 +6,12 @@ if [ ! -d "./logs/LongForecasting" ]; then
     mkdir ./logs/LongForecasting
 fi
 
-if [ ! -d "./logs/LongForecasting/TSMixer" ]; then
-    mkdir ./logs/LongForecasting/TSMixer
+if [ ! -d "./logs/LongForecasting/TSMixerCCM" ]; then
+    mkdir ./logs/LongForecasting/TSMixerCCM
 fi
 
 seq_len=512
-model_name=TSMixer
+model_name=TSMixerCCM
 dataset=ETTm2
 num_channels=7
 
