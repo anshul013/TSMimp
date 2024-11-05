@@ -133,7 +133,7 @@ class Model(nn.Module):
         # print(f"C: {C}")
         # Take mean across batch dimension with gradient clipping
         C_mean = torch.clamp(C.mean(dim=1), min=-100.0, max=100.0)  # [num_clusters, hidden_size]
-        # print(f"C_mean: {C_mean}")
+        print(f"C_mean shape: {C_mean.shape}")
         print(f"shape of self.cluster_embeds: {self.cluster_embeds.shape}")
         # Update cluster embeddings with momentum
         momentum = 0.9
