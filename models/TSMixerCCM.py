@@ -58,12 +58,14 @@ class Model(nn.Module):
         # x = self.rev_norm(x, 'norm')  # Normalize input
         # x = x.transpose(1, 2)  # [Batch, Channel, Input length]
         # h_i = self.channel_mlp(x)  # Channel embeddings via MLP [Batch, Channel, hidden_size]
-        print(f"cluster_embeds: {self.cluster_embeds}")
+        
         # Compute clustering probability matrix P
         c_k_norm = F.normalize(self.cluster_embeds, dim=-1)
         h_i_norm = F.normalize(h_i, dim=-1)
         p_ik = F.softmax(torch.matmul(h_i_norm, c_k_norm.t()), dim=-1)  # [Batch, Channel, K]
-
+        print(f"c_k: {c_k_norm}")
+        print(f"h_i: {h_i_norm}")
+        print(f"p_ik: {p_ik}")
         # Sample Clustering Membership Matrix M
         M = torch.bernoulli(p_ik)  # [Batch, Channel, K]
 
