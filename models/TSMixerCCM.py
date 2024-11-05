@@ -93,7 +93,7 @@ class Model(nn.Module):
         y = y.transpose(1, 2)  # [Batch, pred_len, Channel]
         y = self.rev_norm(y, 'denorm')
         print(f"Final output shape: {y.shape}")
-        
+
         return y
 
 
@@ -148,10 +148,10 @@ class MlpBlockFeatures(nn.Module):
 
 class MlpBlockTimesteps(nn.Module):
     """MLP for timesteps"""
-    def __init__(self, hidden_size, dropout_factor, activation):
+    def __init__(self, seq_len, dropout_factor, activation):
         super(MlpBlockTimesteps, self).__init__()
-        self.batch_norm = nn.BatchNorm1d(hidden_size)
-        self.linear_layer = nn.Linear(hidden_size, hidden_size)
+        self.batch_norm = nn.BatchNorm1d(seq_len)
+        self.linear_layer = nn.Linear(seq_len, seq_len)
         if activation == "gelu":
             self.activation_layer = nn.GELU()
         elif activation == "relu":
@@ -165,8 +165,8 @@ class MlpBlockTimesteps(nn.Module):
         print("\nMlpBlockTimesteps:")
         print(f"Input shape: {x.shape}")
         
-        x = x.transpose(1, 2)
-        print(f"After transpose shape: {x.shape}")
+        # x = x.transpose(1, 2)
+        # print(f"After transpose shape: {x.shape}")
         
         y = self.batch_norm(x)
         print(f"After batch_norm shape: {y.shape}")
