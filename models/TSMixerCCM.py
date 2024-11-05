@@ -102,38 +102,39 @@ class Model(nn.Module):
         Q = self.W_q(self.cluster_embeds)  # [num_clusters, hidden_size]
         K = self.W_k(h_i)  # [batch, channels, hidden_size]
         V = self.W_v(h_i)  # [batch, channels, hidden_size]
-        print(f"Q: {Q}")
-        print(f"K: {K}")
-        print(f"V: {V}")
+        # print(f"Q: {Q}")
+        # print(f"K: {K}")
+        # print(f"V: {V}")
         # Scale factor for attention
         scale = torch.sqrt(torch.tensor(self.hidden_size, dtype=torch.float32, device=x.device))
-        print(f"scale: {scale}")
+        # print(f"scale: {scale}")
         # Compute attention scores with scaled dot product
         attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / scale  # [num_clusters, batch, channels]
-        print(f"attention_scores: {attention_scores}")
+        # print(f"attention_scores: {attention_scores}")
         # Apply temperature scaling to prevent extreme values
         temperature = 1.0
         attention_scores = attention_scores / temperature
-        print(f"attention_scores: {attention_scores}")
+        # print(f"attention_scores: {attention_scores}")
 
         # Clip attention scores to prevent overflow in exp
         attention_scores = torch.clamp(attention_scores, min=-10.0, max=10.0)
-        print(f"attention_scores: {attention_scores}")
+        # print(f"attention_scores: {attention_scores}")
 
         # Compute attention weights with numerical stability
         attention_exp = torch.exp(attention_scores)
         attention_masked = attention_exp * M.transpose(1, 2)
-        print(f"attention_masked: {attention_masked}")
+        # print(f"attention_masked: {attention_masked}")
         # Add small epsilon to prevent division by zero
         eps = 1e-10
         attention_weights = attention_masked / (attention_masked.sum(dim=-1, keepdim=True) + eps)
-        print(f"attention_weights: {attention_weights}")
+        # print(f"attention_weights: {attention_weights}")
         # Compute new cluster embeddings
         C = torch.matmul(attention_weights, V)  # [num_clusters, batch, hidden_size]
-        print(f"C: {C}")
+        # print(f"C: {C}")
         # Take mean across batch dimension with gradient clipping
         C_mean = torch.clamp(C.mean(dim=1), min=-100.0, max=100.0)  # [num_clusters, hidden_size]
-        print(f"C_mean: {C_mean}")
+        # print(f"C_mean: {C_mean}")
+        print(f"shape of self.cluster_embeds: {self.cluster_embeds.shape}")
         # Update cluster embeddings with momentum
         momentum = 0.9
         new_embeds = momentum * self.cluster_embeds + (1 - momentum) * C_mean
