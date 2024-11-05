@@ -134,12 +134,14 @@ class Model(nn.Module):
         # Take mean across batch dimension with gradient clipping
         C_mean = torch.clamp(C.mean(dim=0), min=-100.0, max=100.0)  # [num_clusters, hidden_size]
         print(f"C_mean shape: {C_mean.shape}")
-        print(f"shape of self.cluster_embeds: {self.cluster_embeds.shape}")
+        print(f"C_mean: {C_mean}")
         # Update cluster embeddings with momentum
         momentum = 0.9
         new_embeds = momentum * self.cluster_embeds + (1 - momentum) * C_mean
+        print(f"new_embeds shape: {new_embeds.shape}")
         print(f"new_embeds: {new_embeds}")
         self.cluster_embeds.data.copy_(new_embeds)
+        print(f"cluster_embeds shape: {self.cluster_embeds.shape}")
         print(f"cluster_embeds: {self.cluster_embeds}")    
         # Apply TSMixer blocks
         H = self.mixer_block(h_i)  # [Batch, Channel, hidden_size]
