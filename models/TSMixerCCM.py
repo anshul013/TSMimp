@@ -83,7 +83,9 @@ class Model(nn.Module):
         # Apply TSMixer blocks
         H = self.mixer_block(h_i)  # [Batch, Channel, hidden_size]
         print(f"After mixer_block shape: {H.shape}")
-
+        print(f"H: {H}")
+        print(f"p_ik: {p_ik}")
+        print(f"cluster_embeds: {self.cluster_embeds}")
         # Weight Averaging and Projection
         print("\nWeight Averaging and Projection:")
         print(f"H shape: {H.shape}")
