@@ -122,7 +122,7 @@ class MlpBlockFeatures(nn.Module):
         print(f"Input shape: {x.shape}")
         
         x = x.transpose(1, 2)
-        print(f"After transpose shape: {x.shape}")
+        print(f"After transpose shape of x: {x.shape}")
 
         y = self.batch_norm(x)
         print(f"After batch_norm shape: {y.shape}")
@@ -143,6 +143,10 @@ class MlpBlockFeatures(nn.Module):
             print(f"After linear2 shape: {y.shape}")
         
         y = self.dropout_layer(y)
+
+        x = x.transpose(1, 2)
+        print(f"After transpose shape of x: {x.shape}")
+        
         print(f"Final output shape: {y.shape}")
 
         return x + y
