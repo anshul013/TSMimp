@@ -26,11 +26,28 @@ class Model(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size)
         )
 
-        self.cluster_embeds = nn.Parameter(torch.randn(self.num_clusters, self.hidden_size))
+        # self.cluster_embeds = nn.Parameter(torch.randn(self.num_clusters, self.hidden_size))
 
+        # self.W_q = nn.Linear(self.hidden_size, self.hidden_size)
+        # self.W_k = nn.Linear(self.hidden_size, self.hidden_size)
+        # self.W_v = nn.Linear(self.hidden_size, self.hidden_size)
+
+        # Initialize cluster embeddings with smaller values
+        self.cluster_embeds = nn.Parameter(
+            torch.randn(self.num_clusters, self.hidden_size).to(torch.float32) * 0.02
+        )
+
+        # Initialize attention weights with Xavier/Glorot initialization
         self.W_q = nn.Linear(self.hidden_size, self.hidden_size)
         self.W_k = nn.Linear(self.hidden_size, self.hidden_size)
         self.W_v = nn.Linear(self.hidden_size, self.hidden_size)
+        
+        nn.init.xavier_uniform_(self.W_q.weight)
+        nn.init.xavier_uniform_(self.W_k.weight)
+        nn.init.xavier_uniform_(self.W_v.weight)
+        nn.init.zeros_(self.W_q.bias)
+        nn.init.zeros_(self.W_k.bias)
+        nn.init.zeros_(self.W_v.bias)
 
         self.mixer_block = MixerBlock(self.channels, self.hidden_size,
                                       self.seq_len, configs.dropout,
@@ -68,20 +85,61 @@ class Model(nn.Module):
         # print(f"p_ik: {p_ik}")
         # Sample Clustering Membership Matrix M
         M = torch.bernoulli(p_ik)  # [Batch, Channel, K]
-        print(f"M: {M}")
+        # print(f"M: {M}")
         # Update Cluster Embedding C via Cross Attention
-        Q = self.W_q(self.cluster_embeds)  # [K, d]
-        K = self.W_k(h_i)  # [Batch, Channel, d]
-        V = self.W_v(h_i)  # [Batch, Channel, d]
+        # Q = self.W_q(self.cluster_embeds)  # [K, d]
+        # K = self.W_k(h_i)  # [Batch, Channel, d]
+        # V = self.W_v(h_i)  # [Batch, Channel, d]
 
-        attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / torch.sqrt(torch.tensor(self.hidden_size).float())  # [Batch, K, Channel]
+        # attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / torch.sqrt(torch.tensor(self.hidden_size).float())  # [Batch, K, Channel]
+        # attention_exp = torch.exp(attention_scores)
+        # attention_masked = attention_exp * M.transpose(1, 2)  # [Batch, K, Channel]
+        # attention_weights = attention_masked / attention_masked.sum(dim=-1, keepdim=True)  # Normalize
+
+        # C = torch.matmul(attention_weights, V)  # [Batch, K, d]
+        # self.cluster_embeds.data.copy_(C.mean(dim=0))  # Update cluster embeds with mean across batch
+        # Update Cluster Embedding C via Cross Attention with stability measures
+        Q = self.W_q(self.cluster_embeds)  # [num_clusters, hidden_size]
+        K = self.W_k(h_i)  # [batch, channels, hidden_size]
+        V = self.W_v(h_i)  # [batch, channels, hidden_size]
+        print(f"Q: {Q}")
+        print(f"K: {K}")
+        print(f"V: {V}")
+        # Scale factor for attention
+        scale = torch.sqrt(torch.tensor(self.hidden_size, dtype=torch.float32, device=x.device))
+        print(f"scale: {scale}")
+        # Compute attention scores with scaled dot product
+        attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / scale  # [num_clusters, batch, channels]
+        print(f"attention_scores: {attention_scores}")
+        # Apply temperature scaling to prevent extreme values
+        temperature = 1.0
+        attention_scores = attention_scores / temperature
+        print(f"attention_scores: {attention_scores}")
+
+        # Clip attention scores to prevent overflow in exp
+        attention_scores = torch.clamp(attention_scores, min=-10.0, max=10.0)
+        print(f"attention_scores: {attention_scores}")
+
+        # Compute attention weights with numerical stability
         attention_exp = torch.exp(attention_scores)
-        attention_masked = attention_exp * M.transpose(1, 2)  # [Batch, K, Channel]
-        attention_weights = attention_masked / attention_masked.sum(dim=-1, keepdim=True)  # Normalize
-
-        C = torch.matmul(attention_weights, V)  # [Batch, K, d]
-        self.cluster_embeds.data.copy_(C.mean(dim=0))  # Update cluster embeds with mean across batch
-
+        attention_masked = attention_exp * M.transpose(1, 2)
+        print(f"attention_masked: {attention_masked}")
+        # Add small epsilon to prevent division by zero
+        eps = 1e-10
+        attention_weights = attention_masked / (attention_masked.sum(dim=-1, keepdim=True) + eps)
+        print(f"attention_weights: {attention_weights}")
+        # Compute new cluster embeddings
+        C = torch.matmul(attention_weights, V)  # [num_clusters, batch, hidden_size]
+        print(f"C: {C}")
+        # Take mean across batch dimension with gradient clipping
+        C_mean = torch.clamp(C.mean(dim=1), min=-100.0, max=100.0)  # [num_clusters, hidden_size]
+        print(f"C_mean: {C_mean}")
+        # Update cluster embeddings with momentum
+        momentum = 0.9
+        new_embeds = momentum * self.cluster_embeds + (1 - momentum) * C_mean
+        print(f"new_embeds: {new_embeds}")
+        self.cluster_embeds.data.copy_(new_embeds)
+        print(f"cluster_embeds: {self.cluster_embeds}")    
         # Apply TSMixer blocks
         H = self.mixer_block(h_i)  # [Batch, Channel, hidden_size]
         print(f"After mixer_block shape: {H.shape}")
