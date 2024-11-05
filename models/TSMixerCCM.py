@@ -6,6 +6,11 @@ from models.Rev_in import RevIN
 class Model(nn.Module):
     def __init__(self, configs):
         super(Model, self).__init__()
+        print("\nModel initialization:")
+        print(f"seq_len: {configs.seq_len}, pred_len: {configs.pred_len}")
+        print(f"channels: {configs.enc_in}, hidden_size: {configs.hidden_size}")
+        print(f"num_clusters: {configs.num_clusters}, num_blocks: {configs.num_blocks}")
+
         self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
         self.channels = configs.enc_in
@@ -39,9 +44,20 @@ class Model(nn.Module):
 
     def forward(self, x):
         # x: [Batch, Input length, Channel]
-        x = self.rev_norm(x, 'norm')  # Normalize input
-        x = x.transpose(1, 2)  # [Batch, Channel, Input length]
-        h_i = self.channel_mlp(x)  # Channel embeddings via MLP [Batch, Channel, hidden_size]
+        print("\nModel forward:")
+        print(f"Input shape: {x.shape}")
+        
+        x = self.rev_norm(x, 'norm')
+        print(f"After rev_norm shape: {x.shape}")
+        
+        x = x.transpose(1, 2)
+        print(f"After transpose shape: {x.shape}")
+        
+        h_i = self.channel_mlp(x)
+        print(f"After channel_mlp shape: {h_i.shape}")
+        # x = self.rev_norm(x, 'norm')  # Normalize input
+        # x = x.transpose(1, 2)  # [Batch, Channel, Input length]
+        # h_i = self.channel_mlp(x)  # Channel embeddings via MLP [Batch, Channel, hidden_size]
 
         # Compute clustering probability matrix P
         c_k_norm = F.normalize(self.cluster_embeds, dim=-1)
@@ -66,6 +82,7 @@ class Model(nn.Module):
 
         # Apply TSMixer blocks
         H = self.mixer_block(h_i)  # [Batch, Channel, hidden_size]
+        print(f"After mixer_block shape: {H.shape}")
 
         # Weight Averaging and Projection
         y = torch.zeros(x.size(0), self.channels, self.pred_len, device=x.device)
@@ -75,6 +92,7 @@ class Model(nn.Module):
 
         y = y.transpose(1, 2)  # [Batch, pred_len, Channel]
         y = self.rev_norm(y, 'denorm')
+        print(f"Final output shape: {y.shape}")
         
         return y
 
@@ -100,17 +118,32 @@ class MlpBlockFeatures(nn.Module):
 
     def forward(self, x):
         # x shape: [Batch, Channel, hidden_size]
+        print("\nMlpBlockFeatures:")
+        print(f"Input shape: {x.shape}")
+        
         y = self.batch_norm(x)
-        y = y.transpose(1, 2)  # [Batch, hidden_size, Channel]
+        print(f"After batch_norm shape: {y.shape}")
+        
+        y = y.transpose(1, 2)
+        print(f"After transpose shape: {y.shape}")
+        
         y = self.linear_layer1(y)
+        print(f"After linear1 shape: {y.shape}")
+        
         if self.activation_layer is not None:
             y = self.activation_layer(y)
+            print(f"After activation shape: {y.shape}")
+        
         if not self.single_layer_mixer:
             y = self.dropout_layer(y)
             y = self.linear_layer2(y)
+            print(f"After linear2 shape: {y.shape}")
+        
         y = self.dropout_layer(y)
-        y = y.transpose(1, 2)  # [Batch, Channel, hidden_size]
-        return x + y  # Return [Batch, Channel, hidden_size]
+        y = y.transpose(1, 2)
+        print(f"Final output shape: {y.shape}")
+
+        return x + y
 
 
 class MlpBlockTimesteps(nn.Module):
@@ -129,17 +162,34 @@ class MlpBlockTimesteps(nn.Module):
 
     def forward(self, x):
        # x shape: [Batch, Channel, hidden_size]
-        x = x.transpose(1, 2)  # [Batch, hidden_size, Channel]
+        print("\nMlpBlockTimesteps:")
+        print(f"Input shape: {x.shape}")
+        
+        x = x.transpose(1, 2)
+        print(f"After transpose shape: {x.shape}")
+        
         y = self.batch_norm(x)
+        print(f"After batch_norm shape: {y.shape}")
+        
         y = self.linear_layer(y)
-        y = y.transpose(1, 2)  # [Batch, Channel, hidden_size]
+        print(f"After linear shape: {y.shape}")
+        
+        y = y.transpose(1, 2)
+        print(f"After second transpose shape: {y.shape}")
+        
         y = self.activation_layer(y)
+        print(f"After activation shape: {y.shape}")
+        
         y = self.dropout_layer(y)
-        return x + y  # Return [Batch, Channel, hidden_size]
+        print(f"After dropout shape: {y.shape}")
+        
+        return x + y
 
 class MixerBlock(nn.Module):
     def __init__(self, channels, hidden_size, seq_len, dropout_factor, activation, single_layer_mixer, num_blocks):
         super(MixerBlock, self).__init__()
+        print(f"\nMixerBlock initialization:")
+        print(f"channels: {channels}, hidden_size: {hidden_size}, seq_len: {seq_len}")
         self.channels = channels
         self.hidden_size = hidden_size
         self.seq_len = seq_len
@@ -150,9 +200,15 @@ class MixerBlock(nn.Module):
 
     def forward(self, x):
         # x shape: [Batch, Channel, hidden_size]
-        for _ in range(self.num_blocks):
-            # Timesteps mixing
+        print("\nMixerBlock forward:")
+        print(f"Input shape: {x.shape}")
+        
+        for i in range(self.num_blocks):
+            print(f"\nBlock {i + 1}:")
             x = self.timesteps_mixer(x)
-            # Features mixing
+            print(f"After timesteps_mixer shape: {x.shape}")
+            
             x = self.channels_mixer(x)
-        return x  # [Batch, Channel, hidden_size]
+            print(f"After channels_mixer shape: {x.shape}")
+        
+        return x
