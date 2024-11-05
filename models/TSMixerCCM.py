@@ -121,6 +121,9 @@ class MlpBlockFeatures(nn.Module):
         print("\nMlpBlockFeatures:")
         print(f"Input shape: {x.shape}")
         
+        x = x.transpose(1, 2)
+        print(f"After transpose shape: {x.shape}")
+        
         y = self.batch_norm(x)
         print(f"After batch_norm shape: {y.shape}")
         
