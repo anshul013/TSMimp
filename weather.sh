@@ -20,7 +20,7 @@ python3 -u run_longExp.py \
   --activation 'relu' \
   --dropout 0.3\
   --hidden_size 64\
-  --num_clusters 4\
+  --num_clusters 10\
   --num_blocks 4 \
   --is_training 1 \
   --root_path ./dataset/ \
@@ -43,7 +43,7 @@ python3 -u run_longExp.py \
   --activation 'relu' \
   --dropout 0.7\
   --hidden_size 32\
-  --num_clusters 4\
+  --num_clusters 10\
   --num_blocks 8 \
   --is_training 1 \
   --root_path ./dataset/ \
@@ -66,7 +66,7 @@ python3 -u run_longExp.py \
   --activation 'relu' \
   --dropout 0.7\
   --hidden_size 8\
-  --num_clusters 4\
+  --num_clusters 10\
   --num_blocks 2 \
   --is_training 1 \
   --root_path ./dataset/ \
@@ -89,7 +89,7 @@ python3 -u run_longExp.py \
   --activation 'relu' \
   --dropout 0.7\
   --hidden_size 16\
-  --num_clusters 4\
+  --num_clusters 10\
   --num_blocks 8 \
   --is_training 1 \
   --root_path ./dataset/ \

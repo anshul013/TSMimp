@@ -21,7 +21,7 @@ python3 -u run_longExp.py \
   --dropout 0.9\
   --hidden_size 512\
   --num_blocks 6 \
-  --num_clusters 4\
+  --num_clusters 10\
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path $dataset.csv \
@@ -44,7 +44,7 @@ python3 -u run_longExp.py \
   --dropout 0.9\
   --hidden_size 256\
   --num_blocks 4 \
-  --num_clusters 4\
+  --num_clusters 10\
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path $dataset.csv \
@@ -67,7 +67,7 @@ python3 -u run_longExp.py \
   --dropout 0.9\
   --hidden_size 256\
   --num_blocks 4 \
-  --num_clusters 4\
+  --num_clusters 10\
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path $dataset.csv \
@@ -90,7 +90,7 @@ python3 -u run_longExp.py \
   --dropout 0.1\
   --hidden_size 64\
   --num_blocks 2 \
-  --num_clusters 4\
+  --num_clusters 10\
   --is_training 1 \
   --root_path ./dataset/ \
   --data_path $dataset.csv \
