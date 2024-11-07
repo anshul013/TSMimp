@@ -10,7 +10,7 @@ if [ ! -d "./logs/LongForecasting/TSMixerCCM" ]; then
     mkdir ./logs/LongForecasting/TSMixerCCM
 fi
 seq_len=512
-model_name=TSMixer
+model_name=TSMixerCCM
 dataset=weather
 num_channels=21
 
